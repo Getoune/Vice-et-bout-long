@@ -1,0 +1,192 @@
+from tkinter import *
+import matplotlib.pyplot as plt
+import numpy as np
+from random import randint
+from math import trunc
+from math import pi
+
+
+# Définition de notre fenêtre pour notre logiciel
+fenetre = Tk()
+fenetre.title("Logiciel Boulon SAE 2.5")
+fenetre.geometry("1280x720")
+
+
+###########################################################################################
+#                                  CODE POUR CALCULER
+
+#######################
+# DEFINITION ELEMENTS #
+#######################
+tab_F = []
+tab_diam = [10,12,14,16,18,20]
+tab_class = [4.6,6.8,8.8,9.8,10.9,12.9]
+tab_Rr = [400,600,800,900,1040,1220]
+#peterson = bool(input("True or False (écriver si True, ne rien mettre pour False)"))
+peterson = True
+
+# On créée un tableau pour pouvoir stocker des valeurs pour les calculs de partie filetée
+tab_Kt = []
+a= 1.25   # Peterson page 125
+b= 1.5
+a_b = a/b
+H= 10
+d= 8.4
+# On en déduis donc notre coéfficient entre le diamètre max et min
+coef_Hd = H/d
+
+def troncature_tab_val(tab):
+    tab_bis = []
+    for k in range(len(tab)):
+        tab_bis.append(trunc(tab[k]))
+    return tab_bis
+        
+########################
+# CALCUL Partie Pleine #
+########################
+def calcul_pour_graphique(classe, Rr, d):
+    tau = 0.8*Rr
+    lst = []
+    for k in range(len(d)): 
+        S = (pi*(d[k]**2))/4
+        lst.append(tau*S)
+    return np.array(lst) 
+
+#########################
+# CALCUL Partie Filetée #
+#########################   
+
+# On rajoute le calcul selon la si on casse sur la partie filetée ou pleine
+# Pour cela on va utiliser un abaque pour en sortir un coefficient pour en déduire
+# le résultat pour la partie filetée. On part du principe que le filetage est parallèle.
+# On définit la fonction pour trouver notre Kt (pour calculer les contraintes)
+# Pour cela ouvrir le pdf "Peterson Kt" et aller page environ 480.
+
+def calcul_Kt(a,H):
+    a_H = a/H
+    C1 = 3.1055-(3.4287*a_H)+(0.8522*(a_H**2))
+    C2 = -1.4370 + (10.5053*a_H)-(8.7547*(a_H**2))-(19.6273*(a_H**3))
+    C3 = -1.6753-(14.0851*a_H)+(43.6575*(a_H**2))
+    C4 = 1.7207+(5.7974*a_H)-(27.7463*(a_H**2))+(6.0444*(a_H**3))
+    # D'ou Kt
+    Kt = C1 + (C2*a_b)+(C3*(a_b**2))+(C4*(a_b**3))
+    return Kt
+
+# On fait les calculs et on les stocks.
+for ele in tab_diam:
+    tab_Kt.append(calcul_Kt(a,ele))
+
+#                                  FIN DU CODE POUR CALCULER
+###########################################################################################
+
+##########################
+# GENERATION DES GRAPHES #
+##########################
+
+def affichage_graphe(name):
+    # Une image !!
+    global image
+    largeur = 640
+    hauteur = 480
+    image = PhotoImage(file=name+".png")
+    # Un label pour notre image
+    graphe = Label(fenetre, image = image)
+    graphe.update()
+    graphe.pack(side='left')
+    return 0
+
+def generation_tab_graphe(i):
+    tab_val_filetage = []
+    F_3 = calcul_pour_graphique(tab_class[i], tab_Rr[i],tab_diam)
+    for m in range(len(F_3)):
+        tab_val_filetage.append(F_3[m]/tab_Kt[m])
+    return F_3, tab_val_filetage
+    
+    
+def generation_graphe():
+    global L
+    L = []
+    global L2
+    L2 = []
+    tab_diam = [10,12,14,16,18,20]
+    tab_class = [4.6,6.8,8.8,9.8,10.9,12.9]
+    # peterson = bool(input("True or False (ecriver si True, ne rien mettre pour False)")) 
+    for i in range(len(tab_class)):
+        F_3, tab_val_filetage = generation_tab_graphe(i)
+        # Troncature de nos valeurs pour que ce soit plus propre
+        F_3 = troncature_tab_val(F_3)
+        tab_val_filetage = troncature_tab_val(tab_val_filetage)
+        # génération de nos graphes pour Matplotlib
+        plt.figure(1)
+        plt.plot(tab_diam, F_3, label=f'Classe={tab_class[i]}', color="black")
+        if peterson:
+            plt.plot(tab_diam, tab_val_filetage, label=f'Filetee Classe={tab_class[i]}', color="red")
+        
+        plt.figure(1)                   
+        plt.xlabel('Le diametre d (en mm)')
+        plt.ylabel('Force de cisaillement (en N)')
+        plt.title('Valeurs de T pour différentes valeurs de diamètre')
+        plt.legend()
+        L.append(F_3)
+        L2.append(tab_val_filetage)
+        
+    name = "Graphe"
+    plt.savefig(name)
+    affichage_graphe(name)
+    return name, L, L2
+
+
+#########################
+# GENERATION DU TABLEAU #
+#########################
+
+def affichage_tableau():
+    texte_tab = Label(fenetre, text="---------------------------------------------------------------------------------------------------------", font=20)
+    texte_tab.pack(side="bottom")
+    for u in range(len(tab_diam)):
+        texte_pour_tab = "Diamètre (en mm): " + str(tab_diam[u]) + "    |    "+ str(L[2][u]) + " N                |    "+ str(L2[2][u]) +" N          "
+        texte_tab = Label(fenetre, text=texte_pour_tab, font=20)
+        texte_tab.pack(side="bottom")
+        texte_tab = Label(fenetre, text="-----------------------------------------|-----------------------------|-------------------------------", font=20)
+        texte_tab.pack(side="bottom")
+    texte_tab = Label(fenetre, text="                                              |               Pleine            |          Filetée              ", font=20)
+    texte_tab.pack(side="bottom")
+    texte_tab = Label(fenetre, text="Ici, les calculs ont été fait pour une vis de classe 8.8", font=20)
+    texte_tab.pack(side="bottom")
+    return 0
+
+
+########################################
+# FABRICATION DU LOGICIEL AVEC TKINTER #
+########################################
+
+
+# Boite
+boite_1 = Frame(fenetre, bg="#E10000", bd=2)
+
+# Premier label !
+texte_1 = Label(boite_1, text="Appuyer sur le bouton 'Calculer !' puis sur 'Afficher'", font=25, bg="#E10000", fg="white")
+texte_1.pack()
+
+# Deuxième label !
+texte_2 = Label(boite_1, text="D'autre fonctionnalité peuvent être mises (comme le fait de pouvoir choisir les diamètre précis de nos vis)", font=15, bg="#E10000", fg="white")
+texte_2.pack()
+
+# Label Modifiable
+texte_3 = Entry(boite_1)
+texte_3.pack()
+
+# Premier bouton !
+bouton_1 = Button(boite_1, text="Calculer graphe !", command=generation_graphe, bg="#E10000", fg="white", font=15)
+bouton_1.pack()
+
+# Deuxième bouton !
+bouton_2 = Button(boite_1, text="Afficher tableau", command=affichage_tableau, bg="#E10000", fg="white", font=15)
+bouton_2.pack(side='bottom')
+
+
+# Appliquer notre boite 1 a notre fenetre
+boite_1.pack()
+
+# On fait afficher le logiciel
+fenetre.mainloop()
